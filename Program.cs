@@ -1,71 +1,84 @@
 using System.Net;
-using System.Net.NetworkInformation;
+using System.Net.Cache;
 
-UriBuilder uriBuilder1 = new UriBuilder("http", "nke.ru", 80, "sveden/common/");
-Uri url1 = uriBuilder1.Uri;
-Console.WriteLine(url1);
+var builder = WebApplication.CreateBuilder();
+var app = builder.Build();
 
-UriBuilder uriBuilder2 = new UriBuilder();
-uriBuilder2.Scheme =
-uriBuilder2.Host =
-uriBuilder2.Port =
-uriBuilder2.Path =
-uriBuilder2.Query =
-uriBuilder2.Fragment =
-Uri url2 = uriBuilder2.Uri;
-Console.WriteLine(url2);
+app.MapGet("/", () => new Person("Tom", 38));
+
+app.Run();
 
 using System.Net;
 
-var googleEntry = await
-Dns.GetHostEntryAsync("google.com");
-Console.WriteLine(googleEntry.HostName);
-foreach (var ip in googleEntry.AddressList)
+record Person(string Name, int Age);
+
+using System.Net.Http.Json;
+
+class Program
+
 {
-    Console.WriteLine(ip);
+    static HttpClient httpClient = new HttpClient();
+    static async Task Main()
+    {
+        object? data = await httpClient.GetFromJsonAsync("https://localhost:7073/", typeof(Person));
+        if (data is Person person)
+        {
+            Console.WriteLine($"Name: {person.Name} Age: {person.Age}");
+        }
+    }
 }
+record Person(string Name, int Age);
 
-using System.Net.NetworkInformation;
-
-var adapters = NetworkInterface.GetAllNetworkInterfaces();
-Console.WriteLine($"Найдено {adapters.Length} устройств");
-foreach (NetworkInterface adapter in adapters)
+using System.Net.Http.Json;
+ 
+class Program
 {
-Console.WriteLine();
-    Console.WriteLine($"ID устройства: {adapter.Id}");
-    Console.WriteLine($"Имя устройства: {adapter.Name}");
-    Console.WriteLine($"Описание: {adapter.Description}");
-    Console.WriteLine($"Тип интерфейса: {adapter.NetworkInterfaceType}");
-    Console.WriteLine($"Физический адрес: {adapter.GetPhysicalAddress()}");
-    Console.WriteLine($"Статус: {adapter.OperationalStatus}");
-    Console.WriteLine($"Скорость: {adapter.Speed}");
-    
-    IPInterfaceStatistics stats = adapter.GetIPStatistics();
-    Console.WriteLine($"Получено: {stats.BytesReceived}");
-    Console.WriteLine($"Отправлено: {stats.BytesSent}");
+    static HttpClient httpClient = new HttpClient();
+    static async Task Main()
+    {
+        Person? person = await httpClient.GetFromJsonAsync<Person>("https://localhost:7073/");
+        Console.WriteLine($"Name: {person?.Name} Age: {person?.Age}");
+    }
 }
+record Person(string Name, int Age);
 
-using System.Net.NetworkInformation;
+var builder = WebApplication.CreateBuilder();
+var app = builder.Build();
 
-var ipProps = IPGlobalProperties.GetIPGlobalProperties();
-var tcpConnections = ipProps.GetActiveTcpConnections();
-
-Console.WriteLine($"{tcpConnections.Length} активных TCP-подключений");
-Console.WriteLine();
-foreach (var connection in tcpConnections)
+app.MapGet("/{id?}", (int? id) =>
 {
-    Console.WriteLine($"Локальный адрес: {connection.LocalEndPoint.Address}:{connection.LocalEndPoint.Port}");
-    Console.WriteLine($"Адрес удалённого хоста: {connection.RemoteEndPoint.Address}:{connection.RemoteEndPoint.Port}");
-    Console.WriteLine($"Состояние подключения: {connection.State}");
+    if (id is null)
+        return Results.BadRequest(new { Message = "Некорректные данные в запросе" });
+    else if (id != 1)
+        return Results.NotFound(new { Message = $"Объект с id={id} не существует" });
+    else
+        return Results.Json(new Person("Bob", 42));
+});
+
+app.Run();
+record Person(string Name, int Age);
+
+using System.Net;
+using System.Net.Http.Json;
+class Program
+{
+    static HttpClient httpClient = new HttpClient();
+    static async Task Main()
+    {
+        using var response = await httpClient.GetAsync("https://localhost:7073/1");
+
+        if (response.StatusCode == HttpStatusCode.BadRequest || response.StatusCode == HttpStatusCode.NotFound)
+        {
+            Error? error = await response.Content.ReadFromJsonAsync<Error>();
+            Console.WriteLine(response.StatusCode);
+            Console.WriteLine(error?.Message);
+        }
+        else
+        {
+            Person? person = await response.Content.ReadFromJsonAsync<Person>();
+            Console.WriteLine($"Name: {person?.Name}   Age: {person?.Age}");
+        }
+    }
 }
-
-using System.Net.NetworkInformation;
-
-var ipProps = IPGlobalProperties.GetIPGlobalProperties();
-var ipStats = ipProps.GetIPv4GlobalStatistics();
-Console.WriteLine($"Входящие пакеты: {ipStats.ReceivedPackets}");
-Console.WriteLine($"Исходящие пакеты: {ipStats.OutputPacketRequests}");
-Console.WriteLine($"Отброшено входящих пакетов: {ipStats.ReceivedPacketsDiscarded}");
-Console.WriteLine($"Отброшено исходящих пакетов: {ipStats.OutputPacketsDiscarded}");
-Console.WriteLine($"Ошибки фрагментации: {ipStats.PacketFragmentFailures}");
-Console.WriteLine($"Ошибки восстановления пакетов: {ipStats.PacketReassemblyFailures}");
+record Person(string Name, int Age);
+record Error(string Message);
